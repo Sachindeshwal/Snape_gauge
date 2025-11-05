@@ -1,4 +1,5 @@
-# new_calc.py (Corrected IS:3455 –1971 / ISO Based GO–NO GO Logic)
+# new_calc.py (with authentication check)
+
 """
 Supports two gauge modes:
  - gauge_type="snap"  -> for plain snap gauges (shaft basis)
@@ -15,6 +16,11 @@ ES = upper work limit
 """
 
 from typing import Dict, Tuple, Optional
+
+# ==============================
+# HARD-CODED VALID TOKEN (ONLY for backend validation)
+# ==============================
+VALID_TOKEN = "shiksha@12"
 
 # ==============================
 # ISO Table Data (microns) — Snape table
@@ -66,30 +72,36 @@ def find_nominal_range(n: float):
             return (low, high), v
     return None, None
 
+
 def get_iso_params(nominal_mid: float, tol: float):
     nominal_range, data = find_nominal_range(nominal_mid)
     if data is None:
         return None, None, None, None
 
     total_um = tol * 1000.0
-    idx = next((i for i, t in enumerate(data["T"]) if total_um <= (t + 1e-9)), len(data["T"]) - 1)
-
+    idx = next((i for i, t in enumerate(data["T"]) if total_um <= t + 1e-9), len(data["T"]) - 1)
     column_label = idx + 6
     Z_mm = data["Z"][idx] / 1000.0
     H_half_mm = data["H/2"][idx] / 1000.0
 
     return nominal_range, column_label, Z_mm, H_half_mm
 
+
 # ==============================
-# Main Calculation
+# MAIN FUNCTION (with auth)
 # ==============================
-def calculate_go_no_go_extended(tol_type: str,
+def calculate_go_no_go_extended(auth_token: str,
+                                tol_type: str,
                                 nominal: Optional[float] = None,
                                 val1: Optional[float] = None,
                                 val2: Optional[float] = None,
                                 lower: Optional[float] = None,
                                 upper: Optional[float] = None,
                                 gauge_type: str = "snap"):
+
+    # ✅ AUTH CHECK
+    if auth_token != VALID_TOKEN:
+        return {"error": "Unauthorized request — invalid token"}
 
     # Convert tolerance formats → EI/ES
     if tol_type == "±":
@@ -108,7 +120,6 @@ def calculate_go_no_go_extended(tol_type: str,
         EI = nominal + val1
         ES = nominal + val2
     elif tol_type == "/":
-        # ✅ FIX — ensure min → EI & max → ES (Snape input is Max/Min order)
         EI, ES = min(lower, upper), max(lower, upper)
     else:
         return {"error": "Invalid tolerance type"}
@@ -132,7 +143,7 @@ def calculate_go_no_go_extended(tol_type: str,
         return {"error": "Invalid gauge_type; use 'snap' or 'plug'"}
 
     return {
-        "go": GO, 
+        "go": GO,
         "no_go": NO_GO,
         "gauge_tol": H2,
         "range": rng,
@@ -141,6 +152,3 @@ def calculate_go_no_go_extended(tol_type: str,
         "ES": round(ES, 5),
         "Z": Z
     }
-
-if __name__ == "__main__":
-    print(calculate_go_no_go_extended("±", nominal=31.75, val1=0.05, gauge_type="snap"))
