@@ -11,6 +11,40 @@ st.set_page_config(
     layout="centered"
 )
 
+# ==========================
+# Authentication System
+# ==========================
+AUTH_TOKEN = "shiksha@12"  # Same token as new_calc.py
+
+# Session state init
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+# Login form if not authenticated
+if not st.session_state.authenticated:
+    st.title("🔐 Secure Gauge Calculator Login")
+    token_input = st.text_input("Enter Access Token", type="password")
+    
+    if st.button("Login"):
+        if token_input == AUTH_TOKEN:
+            st.session_state.authenticated = True
+            st.success("✅ Login Successful!")
+            st.rerun()
+        else:
+            st.error("❌ Invalid Token. Access Denied.")
+
+    st.stop()
+
+# Logout button
+with st.sidebar:
+    st.success("✅ Logged In")
+    if st.button("Logout"):
+        st.session_state.authenticated = False
+        st.rerun()
+
+# ==========================
+# Main App UI
+# ==========================
 st.title("🧩 Snape Gauge / Ring Gauge GO / NO-GO Calculator (ISO Standard)")
 st.markdown("""
 This tool calculates **GO** and **NO-GO** gauge values as per ISO standards.  
@@ -33,7 +67,6 @@ tol_type = st.selectbox(
     }[x]
 )
 
-# Input fields based on type
 inputs = {}
 if tol_type == "±":
     inputs["nominal"] = st.number_input("Nominal Size (mm):", step=0.001, format="%.3f")
@@ -49,8 +82,8 @@ elif tol_type in ["+", "-"]:
     inputs["val1"] = st.number_input("Tolerance (mm):", step=0.001, format="%.3f")
 
 elif tol_type == "/":
-    inputs["lower"] = st.number_input("Max Limit (A - Upper) [Snape] (mm):", step=0.001, format="%.3f")
-    inputs["upper"] = st.number_input("Min Limit (B - Lower) [Snape] (mm):", step=0.001, format="%.3f")
+    inputs["lower"] = st.number_input("Min Limit (Lower) (mm):", step=0.001, format="%.3f")
+    inputs["upper"] = st.number_input("Max Limit (Upper) (mm):", step=0.001, format="%.3f")
 
 # Action buttons
 col1, col2 = st.columns([1, 0.4])
@@ -63,7 +96,13 @@ if reset:
     st.experimental_rerun()
 
 if calculate:
-    result = calculate_go_no_go_extended(tol_type, **inputs)
+    # ✅ Add token to pass into new_calc.py
+    result = calculate_go_no_go_extended(
+        auth_token=AUTH_TOKEN,
+        tol_type=tol_type,
+        **inputs
+    )
+
     if "error" in result:
         st.error(result["error"])
     else:
@@ -82,10 +121,9 @@ if calculate:
         with right:
             st.metric("NO-GO Gauge", f"{no_go:.3f} ± {gauge_tol:.4f} mm")
 
-        st.write(f"**Nominal Range Applied:** `{result['range'][0]} - {result['range'][1]} mm`")
-        st.write(f"**Selected ISO Column:** `S{result['column']}`")
-        st.write(f"**Lower / Upper Used:** `{result['EI']:.3f} / {result['ES']:.3f} mm`")
-        st.caption("Computed using ISO T, Z, and H/2 values (micron → mm conversion).")
+        st.write(f"**Nominal Range:** `{result['range'][0]} – {result['range'][1]} mm`")
+        st.write(f"**ISO Column:** `S{result['column']}`")
+        st.write(f"**EI / ES:** `{result['EI']:.3f} / {result['ES']:.3f} mm`")
 
 st.markdown("---")
-st.caption("Developed with ❤️ using Streamlit")
+st.caption("Developed with ❤️ using Streamlit — Secured Access Enabled ✅")
